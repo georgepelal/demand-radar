@@ -33,7 +33,8 @@ App Store, WordPress.org                                                -> repor
 ## Εγκατάσταση (μία φορά)
 
 ```bash
-cd ~/Documents/projects/ml_algorithm
+git clone https://github.com/georgepelal/demand-radar.git
+cd demand-radar
 python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
@@ -44,7 +45,7 @@ ollama pull nomic-embed-text
 
 ## Τρέξιμο
 
-Κάθε φορά που ανοίγεις νέο terminal: `cd ~/Documents/projects/ml_algorithm && source .venv/bin/activate`
+Κάθε φορά που ανοίγεις νέο terminal: `cd demand-radar && source .venv/bin/activate`
 
 Όλα μαζί (για ώρες την πρώτη φορά, μετά μόνο τα καινούρια):
 
@@ -54,7 +55,7 @@ python -m ideafinder collect && python -m ideafinder extract && python -m ideafi
 
 | Εντολή | Τι κάνει |
 |---|---|
-| `collect` | κατεβάζει από Hacker News, Stack Exchange, Bluesky, App Store και WordPress.org μόνο ό,τι λείπει από τη βάση (`--source hn` για μία πηγή, `--source as,wp` μόνο τις κριτικές, ~10 λεπτά) |
+| `collect` | κατεβάζει από Hacker News, Stack Exchange, Bluesky, App Store και WordPress.org μόνο ό,τι λείπει από τη βάση (`--source hn` για μία πηγή, `--source as,wp` μόνο τις κριτικές, ~1 ώρα: ~45 λεπτά το App Store, ~5 λεπτά το WordPress.org) |
 | `extract` | κρατά από κάθε κείμενο τις προτάσεις με ανάγκη/παράπονο |
 | `classify` | το αργό βήμα, σε 2 στάδια. Ctrl+C είναι ασφαλές: συνεχίζει από εκεί που έμεινε. Με `--dry-run` δείχνει μόνο πόσα θα ελέγξει και πόση ώρα θα πάρει |
 | `analyze` | clustering + report.md + brief.md (~20–30 λεπτά· ξανατρέχει μόνο του, χωρίς νέο classify) |
@@ -98,13 +99,14 @@ python -m ideafinder collect && python -m ideafinder extract && python -m ideafi
 | Hacker News | πολλές ανάγκες, κυρίως developers | κανένα (δωρεάν API) |
 | Stack Exchange | ερωτήσεις «Is there a website/tool…» από 25 sites εκτός προγραμματισμού (Personal Finance, Travel, DIY, Parenting, Workplace…) | ~300 αιτήματα τη μέρα χωρίς κλειδί. Αν τελειώσουν, ξανατρέχεις `collect` την επόμενη μέρα. Με δωρεάν κλειδί (https://stackapps.com/apps/oauth/register): `export IDEAFINDER_SE_KEY=...` για 10.000 |
 | Bluesky | καταναλωτές, creators | χωρίς λογαριασμό μόνο ένα δείγμα: έως 15 posts ανά φράση και μήνα (`--bsky-per-month`). Περίπου 1 στα 4 είναι πραγματική ανάγκη |
-| App Store (`as`) | κριτικές 1–3★ των top-grossing εφαρμογών σε 10 κατηγορίες software (Productivity, Business, Finance, Health & Fitness, Education, Photo & Video, Utilities, Lifestyle, Graphics & Design, Developer Tools), 15 ανά κατηγορία. Εκτός: Google, Apple, Meta, Snap, Amazon, OpenAI, Anthropic, X, ByteDance και εφαρμογές γνωριμιών | δημόσιο RSS της Apple, χωρίς κλειδί· έως 4 σελίδες των 50 «most helpful» κριτικών ανά εφαρμογή (`--review-pages`). Το feed συχνά απαντά άδειο, οπότε κάθε σελίδα ξαναζητιέται |
+| App Store (`as`) | κριτικές 1–3★ των top-grossing εφαρμογών σε 10 κατηγορίες software (Productivity, Business, Finance, Health & Fitness, Education, Photo & Video, Utilities, Lifestyle, Graphics & Design, Developer Tools), 15 ανά κατηγορία. Εκτός: Google, Apple, Meta, Snap, Amazon, OpenAI, Anthropic, X, ByteDance και εφαρμογές γνωριμιών | δημόσιο RSS της Apple, χωρίς κλειδί· έως 4 σελίδες των 50 «most helpful» κριτικών ανά εφαρμογή (`--review-pages`). Το feed συχνά απαντά άδειο, οπότε κάθε σελίδα ξαναζητιέται· παρ' όλα αυτά, στο τρέξιμο του Νοεμβρίου 2026 οι 68 από τις 149 εφαρμογές δεν έφεραν καμία κριτική. Ξανατρέχοντας `collect --source as` αργότερα, ζητούνται ξανά μόνο όσες έχουν λιγότερες από 8 |
 | WordPress.org (`wp`) | κριτικές 1–3★ των 100 πιο δημοφιλών plugins (εκτός όσων γράφει η Google ή το WordPress.org) | δημόσιο API και RSS· οι 30 πιο πρόσφατες κριτικές ανά αριθμό αστεριών |
 
 Από κάθε εφαρμογή ή plugin κρατιούνται μόνο οι **8 πιο χρήσιμες κριτικές** (`--per-app`): όσες λένε ότι κάτι λείπει,
 ζητούν κάτι, ότι κάτι αφαιρέθηκε ή μπήκε σε συνδρομή, ή ότι φεύγουν για άλλο προϊόν· προτιμώνται όσες έχουν πολλές
-ψήφους «helpful» και 2–3 αστέρια (πιο συγκεκριμένες από τα 1★). Έτσι ένα πλήρες τρέξιμο φέρνει ~2.000 κριτικές
-(~2 ώρες classify). Για το LLM, ανάγκη σε κριτική = κάτι που το προϊόν δεν έχει, κλειδώνει πίσω από πληρωμή,
+ψήφους «helpful» και 2–3 αστέρια (πιο συγκεκριμένες από τα 1★). Έτσι ένα πλήρες τρέξιμο φέρνει έως ~2.000 κριτικές.
+Στο τρέξιμο του Νοεμβρίου 2026 ήρθαν 1.198 (608 App Store, 590 WordPress.org), το ~60% πέρασε το στάδιο 1, το
+classify με `gemma4:12b` κράτησε ~1 ώρα 50 λεπτά, και 659 κρίθηκαν πραγματικές ανάγκες. Για το LLM, ανάγκη σε κριτική = κάτι που το προϊόν δεν έχει, κλειδώνει πίσω από πληρωμή,
 χρεώνει ακριβά, αφαίρεσε ή περιορίζει (sync, export, συσκευές, integrations, privacy). Δεν είναι ανάγκη: bugs,
 crashes, αργή λειτουργία, προβλήματα λογαριασμού/χρέωσης/επιστροφής χρημάτων/υποστήριξης, σκέτες διαφημίσεις.
 Σε αυτές τις πηγές κάθε εφαρμογή ή plugin μετρά ως ένα «thread», οπότε **threads = σε πόσα διαφορετικά προϊόντα
@@ -172,6 +174,19 @@ python -m ideafinder evaluate --rescore
 δώσε του το `brief.md` (ή πες του πού είναι) και ζήτα του να ακολουθήσει τις οδηγίες στην αρχή του. Για όποια ιδέα
 περάσει: άνοιξε τα links και διάβασε τις συζητήσεις, και μίλα με 5–10 ανθρώπους που έχουν το πρόβλημα.
 
+## Γνωστοί περιορισμοί
+
+- **Τα clusters ανακατεύουν συγγενικά αλλά διαφορετικά προβλήματα, και τα νούμερα φουσκώνουν ακόμα και χωρίς ⚠.**
+  Παράδειγμα από το τρέξιμο του Νοεμβρίου 2026: το cluster «payment and invoicing tools» είχε 41 άτομα και «would pay
+  24%», αλλά μόνο 12 αποσπάσματα αφορούσαν πραγματικά τιμολόγια. Τα υπόλοιπα ήταν εφαρμογές για χρέη, crypto, κάρτες
+  κ.λπ. Πριν εμπιστευτείς τα νούμερα μιας ιδέας, διάβασε τα αποσπάσματά της στο `items.csv`.
+- **Το όριο των 8 κριτικών ανά προϊόν υποτιμά τα προϊόντα με πολλά παράπονα.** Για το ίδιο cluster, το Joist
+  εμφανιζόταν με 4 κριτικές του 2019, ενώ στο App Store έχει 79 κριτικές 1–3★ μόνο στο 2025–26. Για μια ιδέα που
+  περνά τον πρώτο έλεγχο, αξίζει να μαζέψεις όλες τις πρόσφατες κριτικές των σχετικών προϊόντων.
+- **Το growth βγαίνει από λίγα αποσπάσματα** στα μικρά clusters, οπότε π.χ. ×1.4 από 13 αποσπάσματα είναι κυρίως θόρυβος.
+- **Το evaluate δεν έχει τρέξει ακόμα στις 50 ετικέτες κριτικών**: τα σκορ στο `eval/history.csv` είναι μόνο από
+  συζητήσεις (HN, Stack Exchange, Bluesky).
+
 ## Ρυθμίσεις
 
 | Τι | Πώς |
@@ -222,3 +237,6 @@ reports/           τα αποτελέσματα
 - Αυτόματος γρήγορος έλεγχος ανταγωνισμού πριν από το brief
 - Σύγκριση embedding μοντέλων σε ζευγάρια «ίδια ανάγκη ή όχι»
 - Έλεγχος της κατάταξης: «τυφλή» βαθμολόγηση των top ιδεών και ρύθμιση των βαρών του score
+- Πιο «καθαρά» clusters: έλεγχος του LLM ανά απόσπασμα αν ανήκει στο θέμα του cluster, πριν μετρηθούν άτομα και
+  «would pay»
+- `evaluate` στις ετικέτες κριτικών (App Store / WordPress.org)
