@@ -159,6 +159,16 @@ def main(argv=None) -> int:
     e.add_argument("--rescore", action="store_true",
                    help="score the saved answers in eval/runs/ against the current labels (no model calls)")
 
+    dd = sub.add_parser("deepdive", help="6. for one need of a report: all recent 1-3 star reviews of its products, "
+                                         "grouped into complaint themes")
+    dd.add_argument("--cluster", type=int, required=True, help="the need's number in report.md / brief.md")
+    dd.add_argument("--report", help="report folder (default: the latest one in --out)")
+    dd.add_argument("--out", default="reports")
+    dd.add_argument("--apps", help="products to use instead of the cluster's, e.g. as:592163563,wp:cookie-law-info")
+    dd.add_argument("--since", default="2025-01-01", help="oldest review date, YYYY-MM-DD (default: %(default)s)")
+    dd.add_argument("--countries", default="us,gb,ca,au", help="App Store countries (default: %(default)s)")
+    dd.add_argument("--model", default=llm.DEFAULT_LLM)
+
     pe = sub.add_parser("purity-eval", help="measure the cluster topic check against eval/cluster_labels.jsonl")
     pe.add_argument("--models", default=llm.DEFAULT_LLM, help="comma-separated, e.g. qwen2.5:7b,gemma4:12b")
     pe.add_argument("--labels", default=None, help="default: eval/cluster_labels.jsonl")
@@ -209,6 +219,12 @@ def main(argv=None) -> int:
                 return 0
             run_evaluate([m.strip() for m in a.models.split(",") if m.strip()], a.labels, a.limit, a.workers,
                          a.show_errors, examples=not a.no_examples)
+        elif a.cmd == "deepdive":
+            from .deepdive import run_deepdive
+            run_deepdive(con, a.cluster, report=a.report, out_dir=a.out,
+                         apps=[x.strip() for x in a.apps.split(",") if x.strip()] if a.apps else None,
+                         since=a.since, countries=[c.strip() for c in a.countries.split(",") if c.strip()],
+                         model=a.model)
         elif a.cmd == "purity-eval":
             from .purity import DEFAULT_LABELS, run_purity_eval
             run_purity_eval([m.strip() for m in a.models.split(",") if m.strip()], a.labels or DEFAULT_LABELS,
