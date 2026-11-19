@@ -1,4 +1,4 @@
-# Idea Finder 💡
+# Demand Radar 📡
 
 > **Autonomous Market Demand & Product Discovery Pipeline using Local LLMs (Ollama)**
 
