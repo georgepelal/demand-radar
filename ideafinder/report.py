@@ -134,7 +134,8 @@ def render_markdown(main, other, rows, meta) -> str:
         L += [f"score **{c.final:.1f}** · {c.authors} people · {c.threads} threads · {c.n} excerpts · "
               f"{_src_mix(c)} · would pay {_pay(c)} · growth ×{c.growth:.1f}"
               + (f" · coherence {s['coherence']}/5" if s.get("coherence") else "")
-              + (" ⚠ mixed" if c.mixed else ""), ""]
+              + (" ⚠ mixed" if c.mixed else "")
+              + (f" · {len(c.off_topic)} excerpts about other problems left out" if c.off_topic else ""), ""]
         if c.related:
             L += ["Related: " + ", ".join(f"#{rank_of[id(o)]} {_cell(_title(o))}" for o in c.related
                                           if id(o) in rank_of), ""]
@@ -169,7 +170,9 @@ Then return a shortlist of the 5–10 most promising needs with the reasoning an
 How to read the numbers: people = different authors; threads = different discussions; sources = how many excerpts
 came from each community (several communities = stronger signal); would pay = share of excerpts that say they would
 pay or already pay (in brackets: implied costs); growth = how much more often it appears in the most recent third of
-the period than expected (×1.0 = steady). ⚠ = the grouped excerpts mix different problems.
+the period than expected (×1.0 = steady). ⚠ = the grouped excerpts mix different problems. The numbers count only
+the excerpts that the local model judged to be about the need itself; "left out" says how many were about other
+problems (they are in items.csv, marked off-topic).
 
 App Store and WordPress.org excerpts are 1–3 star reviews of top-grossing apps and popular plugins: the product
 exists, and the reviewer says what it lacks, paywalls, overprices or took away. For them a "thread" is one app or
@@ -182,7 +185,8 @@ def _brief_entry(n: int, c, rows, rank_of: dict, quotes: int = 4, long: bool = T
     s = c.summary or {}
     L = [f"## {n}. {_title(c)}" + (" ⚠" if c.mixed else ""), "",
          f"**{c.authors} people · {c.threads} threads · {_src_mix(c)} · would pay {_pay(c)} · "
-         f"growth ×{c.growth:.1f}** (report #{rank_of.get(id(c), '?')})", ""]
+         f"growth ×{c.growth:.1f}** (report #{rank_of.get(id(c), '?')})"
+         + (f" · {len(c.off_topic)} excerpts about other problems left out" if c.off_topic else ""), ""]
     L += _summary_lines(s) if s else [f"- **Keywords:** {', '.join(c.keywords)}"]
     ex = _exists_lines(c, rows, builders=2 if long else 1)
     if ex:
@@ -238,6 +242,8 @@ def write_report(out_dir, main, other, rows, meta, extra: dict | None = None) ->
                 where[i] = f"{prefix}{rank}"
             for i in c.builders:
                 where[i] = f"{prefix}{rank} (builder)"
+            for i in c.off_topic:
+                where[i] = f"{prefix}{rank} (off-topic)"
     with open(out / "clusters.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["group", "rank", "title", "final_score", "score", "people", "threads", "excerpts", "sources",
@@ -268,6 +274,7 @@ def write_report(out_dir, main, other, rows, meta, extra: dict | None = None) ->
          "keywords": c.keywords, "products": c.products, "show_hn": c.show_hn, "reviewed": c.reviewed,
          "builders": [rows[i]["item_id"] for i in c.builders], "related": [_title(o) for o in c.related],
          "summary": c.summary, "representatives": [rows[i]["item_id"] for i in c.reps],
+         "topic_checked": c.checked, "off_topic": [rows[i]["item_id"] for i in c.off_topic],
          "quotes": [rows[i]["item_id"] for i in c.quotes]}
         for clusters in (main, other) for rank, c in enumerate(clusters, 1)]}
     (out / "clusters.json").write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")

@@ -46,6 +46,8 @@ class Cluster:
     sources: dict = field(default_factory=dict)    # {"hn": 12, "se": 3, ...} members per source
     reviewed: list = field(default_factory=list)   # [(product, people)] apps/plugins whose low-star reviews are members
     quotes: list = field(default_factory=list)     # row indices for the brief: closest per source first
+    checked: bool = False                          # members were checked against the described need (purity.py)
+    off_topic: list = field(default_factory=list)  # row indices the check left out
 
     @property
     def n(self) -> int:
@@ -444,9 +446,42 @@ def per_source_picks(main: list[Cluster], rows: list[dict], exclude: set, k: int
     return out
 
 
+MIN_ON_TOPIC = 3  # a described cluster with fewer on-topic excerpts than this is not a need of its own
+
+
+def check_topics(clusters: list[Cluster], rows: list[dict], model: str) -> list[Cluster]:
+    """Keep only the excerpts that describe each cluster's need; returns the clusters left with too few of them."""
+    from .purity import check_members
+
+    todo = [c for c in clusters if c.summary and not c.checked]
+    log(f"checking which excerpts fit their cluster's need: {sum(c.n for c in todo)} excerpts in "
+        f"{len(todo)} clusters with {model}")
+
+    def one(c: Cluster) -> list:
+        return check_members(model, c.summary.get("title", ""), c.summary.get("problem", ""),
+                             [(rows[i]["problem"], rows[i]["snippet"]) for i in c.members])
+
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        futs = [ex.submit(one, c) for c in todo]
+        results, done = [], 0
+        for c, f in zip(todo, futs):
+            results.append(f.result())
+            done += c.n
+            if len(results) % 10 == 0:
+                log(f"  {len(results)}/{len(todo)} clusters, {done} excerpts checked")
+    before = sum(c.n for c in todo)
+    for c, flags in zip(todo, results):
+        c.off_topic = [i for i, f in zip(c.members, flags) if not f]
+        c.members = [i for i, f in zip(c.members, flags) if f]
+        c.checked = True
+    kept = sum(c.n for c in todo)
+    log(f"  kept {kept} of {before} excerpts ({kept / max(before, 1):.0%}); the rest were about other problems")
+    return [c for c in todo if c.n < MIN_ON_TOPIC]
+
+
 def run_analyze(con, mode: str = "auto", embed: str = "auto", embed_model: str = llm.DEFAULT_EMBED,
                 llm_model: str = llm.DEFAULT_LLM, min_cluster_size: int | None = None, top: int = 40,
-                summary: bool = True, out_dir: str = "reports", seed: int = 42):
+                summary: bool = True, out_dir: str = "reports", seed: int = 42, purity: bool = True):
     rows, mode, total, checked, detailed = load_rows(con, mode)
     groups = Counter(r["group"] for r in rows)
     log(f"analyze: mode={mode} ({checked}/{total} excerpts checked by LLM), {len(rows)} excerpts used"
@@ -535,6 +570,16 @@ def run_analyze(con, mode: str = "auto", embed: str = "auto", embed_model: str =
                     main = [m for m in main if m is not c] + parts
                     prepare(parts, main + other)
                     describe(parts)
+            if purity:
+                described = [c for c in main if c.summary]
+                gone = check_topics(described, rows, llm_model)
+                if gone:
+                    log(f"  {len(gone)} clusters had fewer than {MIN_ON_TOPIC} excerpts about their own need and "
+                        "were dropped")
+                    gone_ids = {id(c) for c in gone}
+                    head = [c for c in head if id(c) not in gone_ids]
+                    main = [c for c in main if id(c) not in gone_ids]
+                prepare([c for c in main if c.checked], main + other)  # recount people, threads, would pay
             summarized = True
         else:
             log(f"skipping descriptions: Ollama model '{llm_model}' not available")
@@ -555,7 +600,8 @@ def run_analyze(con, mode: str = "auto", embed: str = "auto", embed_model: str =
             "llm_checked": checked, "groups": dict(groups),
             "embedding": embed_model if embed == "ollama" else "tfidf", "clustering": info,
             "clustering_other": info_other if by_group["other"] else None,
-            "summaries": llm_model if summarized else None, "top": top}
+            "summaries": llm_model if summarized else None, "top": top,
+            "topic_check": llm_model if any(c.checked for c in main) else None}
     path = write_report(out_dir, main, other, rows, meta, extra)
     log(f"report written to {path}/report.md")
     return path

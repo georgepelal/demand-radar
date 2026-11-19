@@ -1,0 +1,2 @@
+date,model,items,purity_before,purity_after,recall,accuracy,s_per_item
+2026-11-19_1749,gemma4:12b,192,0.516,0.882,0.758,0.823,0.57

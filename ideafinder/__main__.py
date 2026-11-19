@@ -26,6 +26,9 @@ def _add_analyze_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--top", type=int, default=40,
                    help="needs to describe in detail and put in brief.md (default: %(default)s)")
     p.add_argument("--no-summary", action="store_true", help="don't ask the LLM to describe clusters")
+    p.add_argument("--no-topic-check", action="store_true",
+                   help="count every excerpt of a described cluster, without checking it is about the same need "
+                        "(faster, but the numbers mix related problems)")
     p.add_argument("--out", default="reports")
     p.add_argument("--seed", type=int, default=42)
 
@@ -82,6 +85,7 @@ def _analyze(con, a, no_llm: bool = False):
         con, mode="raw" if no_llm else a.mode, embed="tfidf" if no_llm else a.embed,
         embed_model=a.embed_model, llm_model=a.summary_model or a.model, min_cluster_size=a.min_cluster_size,
         top=a.top, summary=not (no_llm or a.no_summary), out_dir=a.out, seed=a.seed,
+        purity=not getattr(a, "no_topic_check", False),
     )
 
 
@@ -155,6 +159,11 @@ def main(argv=None) -> int:
     e.add_argument("--rescore", action="store_true",
                    help="score the saved answers in eval/runs/ against the current labels (no model calls)")
 
+    pe = sub.add_parser("purity-eval", help="measure the cluster topic check against eval/cluster_labels.jsonl")
+    pe.add_argument("--models", default=llm.DEFAULT_LLM, help="comma-separated, e.g. qwen2.5:7b,gemma4:12b")
+    pe.add_argument("--labels", default=None, help="default: eval/cluster_labels.jsonl")
+    pe.add_argument("--show-errors", action="store_true", help="print the excerpts the model got wrong")
+
     m = sub.add_parser("compete", help="5. for the top ideas of a report: what already exists, is there a gap?")
     m.add_argument("--model", default=llm.DEFAULT_LLM)
     m.add_argument("--top", type=int, default=15, help="how many top ideas to check (default: %(default)s)")
@@ -200,6 +209,10 @@ def main(argv=None) -> int:
                 return 0
             run_evaluate([m.strip() for m in a.models.split(",") if m.strip()], a.labels, a.limit, a.workers,
                          a.show_errors, examples=not a.no_examples)
+        elif a.cmd == "purity-eval":
+            from .purity import DEFAULT_LABELS, run_purity_eval
+            run_purity_eval([m.strip() for m in a.models.split(",") if m.strip()], a.labels or DEFAULT_LABELS,
+                            a.show_errors)
         elif a.cmd == "compete":
             from .compete import run_compete
             run_compete(con, report=a.report, out_dir=a.out, top=a.top, model=a.model)
